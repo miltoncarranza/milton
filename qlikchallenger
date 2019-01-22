@@ -1,0 +1,159 @@
+
+################################################################################################
+## EXTRACCION
+################################################################################################
+CREDITO:
+LOAD
+    COD_INSTITUCION,
+    COD_PROVINCIA,
+    MONTO,
+    OPERACION,
+    FECHA
+FROM [lib://DATA/DATA\CREDITO.xlsx]
+(ooxml, embedded labels, header is 1 lines, table is [Squirrel SQL Export]);
+
+
+store * from CREDITO into [lib://DATA/EXTRACCION/CREDITO.qvd];
+drop table CREDITO;
+ 
+ 
+CARTERA_SEMESTRE1:
+LOAD
+    COD_INSTITUCION,
+    COD_PROVINCIA,
+    XVENCER,
+    VENCIDA,
+    NDI,
+    FECHA
+FROM [lib://DATA/DATA\CARTERA_SEMESTRE1.csv]
+(txt, codepage is 28591, embedded labels, delimiter is ',', msq);
+store * from CARTERA_SEMESTRE1 into [lib://DATA/EXTRACCION/CARTERA_SEMESTRE1.qvd];
+drop table CARTERA_SEMESTRE1;
+
+CARTERA_SEMESTRE2:
+LOAD
+    COD_INSTITUCION,
+    COD_PROVINCIA,
+    XVENCER,
+    VENCIDA,
+    NDI,
+    FECHA
+FROM [lib://DATA/DATA\CARTERA_SEMESTRE2.csv]
+(txt, codepage is 28591, embedded labels, delimiter is ',', msq);
+
+store * from CARTERA_SEMESTRE2 into [lib://DATA/EXTRACCION/CARTERA_SEMESTRE2.qvd];
+drop table CARTERA_SEMESTRE2;
+
+INSTITUCIONES:
+LOAD
+    COD_INSTITUCION,
+    INSTITUCION,
+    TIPO_INSTITUCION
+FROM [lib://DATA/DATA\INSTITUCIONES.xlsx]
+(ooxml, embedded labels, table is [Squirrel SQL Export]);
+
+store * from INSTITUCIONES into [lib://DATA/EXTRACCION/INSTITUCIONES.qvd];
+drop table INSTITUCIONES;
+
+provincia_kml:
+LOAD
+    provincia_kml.Name,
+//     provincia_kml.Point,
+    provincia_kml.Area
+//     provincia_kml.Line
+FROM [lib://DATA/DATA\provincia_kml.kml]
+(kml, Table is [provincia_kml/provincia_kml]);
+
+store * from provincia_kml into [lib://DATA/EXTRACCION/provincia_kml.qvd];
+drop table provincia_kml;
+
+################################################################################################
+## TRANSFORMACION
+################################################################################################
+
+CARTERAS:
+LOAD
+    COD_INSTITUCION ,
+    COD_PROVINCIA,
+    XVENCER,
+    VENCIDA,
+    NDI,
+    FECHA
+FROM [lib://DATA/EXTRACCION\CARTERA_SEMESTRE1.qvd]
+(qvd);
+Concatenate
+LOAD
+    COD_INSTITUCION,
+    COD_PROVINCIA,
+    XVENCER,
+    VENCIDA,
+    NDI,
+    FECHA
+FROM [lib://DATA/EXTRACCION\CARTERA_SEMESTRE2.qvd]
+(qvd);
+store * from CARTERAS into [lib://DATA/TRANSFORMACION/CARTERAS.qvd];
+drop table CARTERAS;
+ 
+cartera_credito:
+LOAD
+    COD_INSTITUCION as %idInstitucion,
+    COD_PROVINCIA as %idProvincia,
+    XVENCER,
+    VENCIDA,
+    NDI,    
+     year(FECHA) as Año,
+    month(FECHA) as Mes,
+    day(FECHA) as Día,
+    monthname(FECHA) as [Año-Mes]
+FROM [lib://DATA/TRANSFORMACION\CARTERAS.qvd]
+(qvd);
+INNER Join 
+LOAD
+    COD_INSTITUCION as %idInstitucion,
+    COD_PROVINCIA as %idProvincia,
+    MONTO,
+    OPERACION,
+   monthname(FECHA) as [Año-Mes]
+FROM [lib://DATA/EXTRACCION\CREDITO.qvd]
+(qvd);
+ 
+store * from cartera_credito into [lib://DATA/MODELO/cartera_credito.qvd];
+drop table cartera_credito;
+
+instituciones:
+LOAD
+    COD_INSTITUCION as idInstitucion,
+    INSTITUCION,
+    TIPO_INSTITUCION
+FROM [lib://DATA/EXTRACCION\INSTITUCIONES.qvd]
+(qvd);
+
+store * from instituciones into [lib://DATA/MODELO/instituciones.qvd];
+drop table instituciones;
+
+
+provincia:
+LOAD
+    provincia_kml.Name as codigoProvincia,
+    provincia_kml.Area as area
+FROM [lib://DATA/EXTRACCION\provincia_kml.qvd]
+(qvd);
+
+
+store * from provincia into [lib://DATA/MODELO/provincia.qvd];
+drop table provincia;
+   
+   
+// LOAD
+//     provincia_kml.Name,
+//     provincia_kml.Area
+// FROM [lib://DATA/EXTRACCION\provincia_kml.qvd]
+// (qvd);
+
+################################################################################################
+## CARGA
+################################################################################################
+LOAD * FROM [lib://DATA/MODELO/*.qvd] (qvd);
+
+
+
